@@ -6,8 +6,8 @@ from _paraminf import Cd_obsCost, Cd_obsCost_grad
 
 def precompute_gp(params,lapInfres):
 
-    n_timePoints = params['latent_traj'].shape[1]
-    nDims = params['latent_traj'].shape[0]
+    n_timePoints = params['latent_traj'][0].shape[1]
+    nDims = params['latent_traj'][0].shape[0]
     T = len(params['t']) 
     t1 = np.tile(params['t'],[T,1])
 
@@ -15,13 +15,19 @@ def precompute_gp(params,lapInfres):
     difSq = tdif**2
 
     precomp = []
+
     for dim in range(nDims):
-        tempSum = lapInfres['post_cov_GP'][dim] + np.outer(lapInfres['post_mean'][dim],lapInfres['post_mean'][dim])
+        tempSum = 0
+        for trl_idx in range(params['nTrials']):
+            tempSum += (params['post_cov_GP'][trl_idx][dim] +
+                        np.outer(params['latent_traj'][trl_idx][dim],
+                                params['latent_traj'][trl_idx][dim])
+                        )
 
         precomp.append( {'T':n_timePoints,
                          'Tdif': tdif,
                          'difSq': difSq,
-                         'numTrials': 1,
+                         'numTrials': params['nTrials'],
                          'PautoSum': tempSum
                         }
                       )
@@ -31,7 +37,7 @@ def precompute_gp(params,lapInfres):
 
 
 def GP_timescale_Cost(tav,precomp):
-    tav = np.exp(tav)
+    tav = np.exp(tav) + 1e-6
     n_timePoints = precomp['T']
 
     temp1 = (1-1e-3)*np.exp(-precomp['difSq']*tav*.5)
