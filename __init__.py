@@ -1,4 +1,5 @@
 import _util
+import _gpinf
 import _lapinf
 import _paraminf
 import _simdata

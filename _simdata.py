@@ -48,9 +48,9 @@ def _gen_sample_traj(t,l,pretty,n_timePoints):
 
 	return traj
 
-def genSim_data_static(n_neurons=80,nDims=3,n_timePoints=67,pretty=False):
+def genSim_data_static(n_neurons=80,nDims=3,n_timePoints=67,pretty=False,nTrials=5):
 	
-	""" 
+    """ 
 		Generate simulated data for testing the algorithm
 		
 		Arguments:
@@ -63,30 +63,39 @@ def genSim_data_static(n_neurons=80,nDims=3,n_timePoints=67,pretty=False):
 				      number of latent dimensions
 		
 
-		n_timePoints: int
+	    n_timePoints: int
 					  number of timepoints comrpising a trial
 
-	"""
-	t = np.linspace(-33,33,num=n_timePoints)/10
-	C,d =_gen_rand_Cd(n_neurons,nDims)
+    """
+    t = np.linspace(-33,33,num=n_timePoints)/10
+    C,d =_gen_rand_Cd(n_neurons,nDims)
 
-	length_scales_GP = [10**(1 if i== 0 else -i*.2) for i in range(nDims)]
-
-	x = np.zeros([nDims,n_timePoints])  #the latent trajectories
-	for i in range(nDims):
-		x[i] = _gen_sample_traj(t,l=length_scales_GP[i],pretty=pretty,n_timePoints=n_timePoints) #latent states
-
-	CIFs = np.exp(C.dot(x) + d[:,None])
-	y = np.random.poisson(CIFs + np.abs(np.random.normal(loc=0,scale=1,size=CIFs.shape))) #spike trains
-
-	ground_truth_dict = {'C':C,
+    length_scales_GP = [10**(1 if i== 0 else -i*.2) for i in range(nDims)]
+    latent_trajs = [];
+    CIFs = []
+    ys = []
+    for trl_idx in range(nTrials):
+        x = np.zeros([nDims,n_timePoints])  #the latent trajectories
+        for i in range(nDims):
+		    x[i] = _gen_sample_traj(t,l=length_scales_GP[i],pretty=pretty,n_timePoints=n_timePoints) #latent states
+        
+        
+        cifs = np.exp(C.dot(x) + d[:,None])
+        y = np.random.poisson(cifs +
+                np.abs(np.random.normal(loc=0,scale=1,size=cifs.shape))) #spike trains
+        CIFs.append(cifs)
+        ys.append(y)
+        latent_trajs.append(x)
+    ground_truth_dict = {'C':C,
 					    'd': d,
 					    'l':length_scales_GP,
-					    'latent_traj': x,
+					    'latent_traj': latent_trajs,
 					    'CIFs': CIFs,
-                        't': t}
+                        't': t,
+                        'nTrials':nTrials
+                        }
 
-	return y, ground_truth_dict,t
+    return ys, ground_truth_dict
 
 
 
