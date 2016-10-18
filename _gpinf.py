@@ -36,12 +36,14 @@ def precompute_gp(params,lapInfres):
 
 
 
-def GP_timescale_Cost(tav,precomp):
+def GP_timescale_Cost(tav,precomp,params):
+    epsNoise = params['epsNoise']
+    epsSignal = (1-epsNoise)
     tav = np.exp(tav) + 1e-3
     n_timePoints = precomp['T']
 
-    temp1 = (1-1e-3)*np.exp(-precomp['difSq']*tav*.5)
-    K = temp1 + 1e-3*np.eye(n_timePoints)
+    temp1 = epsSignal*np.exp(-precomp['difSq']*tav*.5)
+    K = temp1 + epsNoise*np.eye(n_timePoints)
     s,logdet = np.linalg.slogdet(K)
     logdet_K = logdet*s
     Kinv = np.linalg.inv(K)

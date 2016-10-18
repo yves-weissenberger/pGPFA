@@ -3,7 +3,7 @@ import scipy.spatial.distance as dst
 
 
 def make_Kbig(params,t,nDims,epsNoise=1e-3):
-
+    epsNoise = params['epsNoise']
     epsSignal = (1-epsNoise)
     nT = len(t)  #number of time points
     #nDims = params['C'].shape[1] #dimensionality of the latent space
