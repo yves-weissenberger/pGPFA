@@ -37,7 +37,7 @@ def precompute_gp(params,lapInfres):
 
 
 def GP_timescale_Cost(tav,precomp):
-    tav = np.exp(tav) + 1e-6
+    tav = np.exp(tav) + 1e-3
     n_timePoints = precomp['T']
 
     temp1 = (1-1e-3)*np.exp(-precomp['difSq']*tav*.5)
