@@ -35,7 +35,7 @@ All results below are on single trials. In the case of real data, this is cross-
 
 
 #### Observed (blue), Underlying (black-dash) and Inferred (Orange) Firing Rates
-![Alt text](./snglTrl_Fit_cv3.png)
+![Alt text](./ims/snglTrl_Fit_cv3.png)
 ### See GPFA_package notebook for example of use on simulated data
 
 #This code borrows (heavily) from Hooram Nam's implementation of the same algorithm.
