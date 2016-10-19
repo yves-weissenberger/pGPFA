@@ -36,24 +36,24 @@ class pGPFA(object):
         import scipy.optimize as op
 
         st = time.time()
+        self.hists = {'lapinf':[],
+                      'Cdinf':[],
+                      'tavinf':[]
+                     }
+        
+        
         for iterN in range(nIter):
             print "Running EM iteration %s" %iterN,
             #######   E-step   ###########
             lapinfres = EM.E_step(self.data,self.params)
             self._update_params_E(lapinfres)
-            
+
+            self.hists['lapinf'].append(lapinfres)
             #######   M-step   ###########
             Cdinf, tavInf = EM.M_step(self.data,self.params)
-            
-            #precomp = precompute_gp(self.params,lapinfres)
-            #tavInf = []
-            #for dim in range(self.nDims):
-            #    res = op.minimize(GP_timescale_Cost,
-            #                      x0 = self.params['l'][dim],
-            #                      args=(precomp[dim],self.params),
-            #                      method='TNC',
-            #                      options={'minfev':0,'gtol':1e-8,'eps':1e-8}
-            #                      )
+
+            self.hists['Cdinf'].append(Cdinf); self.hists['tavinf'].append(tavInf)
+
             self._update_params_M(Cdinf,tavInf)
             
             print "|| log(L) after M step is: %s ||  total time elapsed: %ss" %(_np.round(Cdinf['logL'],decimals=2),_np.round(time.time()-st,decimals=1))
