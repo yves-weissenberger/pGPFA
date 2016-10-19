@@ -4,7 +4,7 @@ from _util import make_Cbig, make_Kbig, make_xbar, make_ybar, makeCd_from_vec,ma
 from _lapinf import lap_post_unNorm, lap_post_grad, lap_post_hess
 from _paraminf import Cd_obsCost, Cd_obsCost_grad
 
-def precompute_gp(params,lapInfres):
+def precompute_gp(params):
 
     n_timePoints = params['latent_traj'][0].shape[1]
     nDims = params['latent_traj'][0].shape[0]

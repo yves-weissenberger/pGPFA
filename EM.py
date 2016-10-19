@@ -2,7 +2,9 @@ import numpy as np
 import scipy.optimize as op
 from _util import make_Cbig, make_Kbig, make_xbar, make_ybar, makeCd_from_vec,make_vec_Cd
 from _lapinf import lap_post_unNorm, lap_post_grad, lap_post_hess
-from _paraminf import Cd_obsCost, Cd_obsCost_grad
+from _paraminf import Cd_obsCost, Cd_obsCost_grad, Cd_obsCostFast,Cd_obsCost_gradFast
+from _gpinf import precompute_gp, GP_timescale_Cost
+
 
 def E_step(ys,params):
 
@@ -86,11 +88,11 @@ def M_step(ys,params):
     vecCd = make_vec_Cd(params['C'],params['d']) 
     ####Infer the C and d parameters
     resCd = op.minimize(
-        fun = Cd_obsCost,
+        fun = Cd_obsCostFast,
         x0 = vecCd,
         method = 'TNC',
         args = (ys,params['latent_traj'],params['post_cov_Cd'],params),
-        jac = Cd_obsCost_grad,
+        jac = Cd_obsCost_gradFast,
         options = {'disp': False,
                   'maxiter':500,'ftol':1e-16,'gtol':1e-16,'xtol':1e-16}
         )
@@ -100,4 +102,17 @@ def M_step(ys,params):
                 'logL':resCd.fun
                }
     ####Infer the GP timescale parameters
-    return Cdinfres
+            
+    precomp = precompute_gp(params)
+    tavInf = []
+    for dim in range(nDims):
+        res = op.minimize(GP_timescale_Cost,
+                          x0 = params['l'][dim],
+                          args=(precomp[dim],params),
+                          method='TNC',
+                          options={'minfev':0,'gtol':1e-8,'eps':1e-8}
+                          )
+
+        tavInf.append(res)
+
+    return Cdinfres, tavInf

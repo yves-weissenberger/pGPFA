@@ -3,7 +3,8 @@ import _gpinf
 import _lapinf
 import _paraminf
 import _simdata
-import pGPFA
+from pGPFA_model import pGPFA as model
+
 import EM
 
 from _simdata import genSim_data_static
