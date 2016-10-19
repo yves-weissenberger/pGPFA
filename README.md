@@ -16,8 +16,14 @@ The firing rates of individual neurons, $\textbf{y}$, in a population linearly c
 
 $\textbf{y}|\textbf{x} \sim \mathcal{P}(\textbf{y}|exp(\textbf{C}\textbf{x} + \textbf{d})$
 
+## Results
+
+### Simulated Data
+
+### Real Data
+![Alt text](./ims/firing_rates.png)
 
 
 
-
+### See GPFA_package notebook for example of use on simulated data
 this code borrows (heavily) from Hooram Nam's implementation of the same algorithm
