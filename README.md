@@ -18,12 +18,24 @@ $\textbf{y}|\textbf{x} \sim \mathcal{P}(\textbf{y}|exp(\textbf{C}\textbf{x} + \t
 
 ## Results
 
+All results below are on single trials. In the case of real data, this is cross-validated
+
 ### Simulated Data
 
-### Real Data
+#### Inferred Latent States
+![Alt text](./ims/latent_states.png)
+
+
+#### Inferred vs Ground Truth Latent States
+![Alt text](./ims/SVD_states.png)
+
+#### Observed (blue), Underlying (black-dash) and Inferred (Orange) Firing Rates
 ![Alt text](./ims/firing_rates.png)
+### Real Data
 
 
-
+#### Observed (blue), Underlying (black-dash) and Inferred (Orange) Firing Rates
+![Alt text](./snglTrl_Fit_cv3.png)
 ### See GPFA_package notebook for example of use on simulated data
-this code borrows (heavily) from Hooram Nam's implementation of the same algorithm
+
+#This code borrows (heavily) from Hooram Nam's implementation of the same algorithm.
