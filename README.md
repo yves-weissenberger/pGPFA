@@ -42,8 +42,9 @@ All results below are on single trials. In the case of real data, this is cross-
 
 https://github.com/mackelab/poisson-gpfa
 
-If you are interested in using the code, you are probably better off using their implementation for more choice of inference methods. 
-Additional features have not been added here, yet....
+If you are interested in using the code, you are probably better off using their implementation for more choice of inference methods and more features. As far as has been tested, our code reproduce exactly the results of theirs  
+Additional features beyond their have not been added here, yet. 
+ :-)
 
 #Copyright on parts of code from Macke lab
 
