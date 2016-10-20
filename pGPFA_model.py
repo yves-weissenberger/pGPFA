@@ -51,7 +51,13 @@ class pGPFA(object):
             self.cross_validation['train_idxs'] = train_idxs
             self.cross_validation['validate_idxs'] = validate_idxs
             self.cross_validation['test_idxs'] = test_idxs
-
+            
+            self.dsets = {'train': self.train_data,
+                          'validate': self.validate_data,
+                          'test': self.test_data
+                          }
+    def _get_trl_by_idx(trlIdx):
+        print 1
     def _init_fit_params(self):
         self.params = {'latent_traj': [_np.zeros([self.nDims,self.n_timePoints]) for i in range(self.nTrials)],
                        'C': _np.random.normal(size=[self.n_neurons,self.nDims]),
@@ -103,4 +109,14 @@ class pGPFA(object):
            self.params['l'][dim] = (1/_np.exp(tavInf[dim].x))**(0.5)
            #print self.params['l'][dim]
 
-            
+
+
+    def leave_n_out(self,n,trl_idx,dset='validate'):
+        nIdxs = range(self.n_neurons)
+        lo_idxs = _np.random.choice(nIdxs,replace=False,size=N)
+        C_lo = np.delete(self.params['C'],lo_idxs,axis=0)
+        d_lo = np.delete(self.params['d'],lo_idxs)
+        
+        y_lo = np.delete(self.dsets[dset][trl_idx])
+
+
