@@ -21,7 +21,21 @@ def make_Kbig(params,t,nDims,epsNoise=1e-3):
                 R_big[dim+t1_idx*nDims,dim+t2_idx*nDims] = 1
     return K_big, R_big
 
+def covByDim(cov_matrix,nDims,n_timePoints):
+        #for inference of tav of the GP
 
+        #first sort by dims
+        postCov_alt = np.zeros(cov_matrix.shape)
+        for dim1 in range(nDims):
+            for dim2 in range(nDims):
+                postCov_alt[dim1*n_timePoints:(dim1+1)*n_timePoints,dim2*n_timePoints:(dim2+1)*n_timePoints] = cov_matrix[dim1::nDims,dim2::nDims]
+        #now separate
+        post_cov_by_latent = np.zeros([nDims,n_timePoints,n_timePoints])
+        for i in range(nDims):
+            post_cov_by_latent[i] = postCov_alt[i*n_timePoints:(i+1)*n_timePoints,i*n_timePoints:(i+1)*n_timePoints]
+        
+        return postCov_alt, post_cov_by_latent
+ 
 
 
 def make_Cbig(C,n_timePoints):

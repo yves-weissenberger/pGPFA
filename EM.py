@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.optimize as op
-from _util import make_Cbig, make_Kbig, make_xbar, make_ybar, makeCd_from_vec,make_vec_Cd
+from _util import make_Cbig, make_Kbig, make_xbar, make_ybar, makeCd_from_vec,make_vec_Cd, covByDim
 from _lapinf import lap_post_unNorm, lap_post_grad, lap_post_hess
 from _paraminf import Cd_obsCost, Cd_obsCost_grad, Cd_obsCostFast,Cd_obsCost_gradFast
 from _gpinf import precompute_gp, GP_timescale_Cost
@@ -45,16 +45,16 @@ def E_step(ys,params):
                 post_cov_by_timepoint[i] = postCov[i*nDims:(i+1)*nDims,i*nDims:(i+1)*nDims]
 
         #for inference of tav of the GP
-
+        postCov_GP, post_cov_by_latent = covByDim(postCov,nDims,n_timePoints)
         #first sort by dims
-        postCov_GP = np.zeros(postCov.shape)
-        for dim1 in range(nDims):
-            for dim2 in range(nDims):
-                postCov_GP[dim1*n_timePoints:(dim1+1)*n_timePoints,dim2*n_timePoints:(dim2+1)*n_timePoints] = postCov[dim1::nDims,dim2::nDims]
+        #postCov_GP = np.zeros(postCov.shape)
+        #for dim1 in range(nDims):
+        #    for dim2 in range(nDims):
+        #        postCov_GP[dim1*n_timePoints:(dim1+1)*n_timePoints,dim2*n_timePoints:(dim2+1)*n_timePoints] = postCov[dim1::nDims,dim2::nDims]
         #now separate
-        post_cov_by_latent = np.zeros([nDims,n_timePoints,n_timePoints])
-        for i in range(nDims):
-            post_cov_by_latent[i] = postCov_GP[i*n_timePoints:(i+1)*n_timePoints,i*n_timePoints:(i+1)*n_timePoints]
+        #post_cov_by_latent = np.zeros([nDims,n_timePoints,n_timePoints])
+        #for i in range(nDims):
+        #    post_cov_by_latent[i] = postCov_GP[i*n_timePoints:(i+1)*n_timePoints,i*n_timePoints:(i+1)*n_timePoints]
 
         if trl_idx==0: 
             lapInfRes = {'post_mean': [x_post_mean],

@@ -4,29 +4,61 @@ import numpy as _np
 class pGPFA(object):
         
 
-    def __init__(self,data,t,nDims,initParams=False,epsNoise=1e-3):
-        self.data = data
+    def __init__(self,data,t,nDims,initParams=False,epsNoise=1e-3,**kwargs):
 
-        nTrials = len(self.data)
-        self.n_neurons = self.data[0].shape[0]
-        self.n_timePoints = self.data[0].shape[1]
+
+
+        kwargs.setdefault('cross_validate',True)
+        kwargs.setdefault('type','tvt')
+        kwargs.setdefault('CV_fractions',[.7,.2,.1])
+        self.cross_validation = kwargs
+
+        self.data = data
+        self.train_data=data
+
+        nTrials = len(self.train_data)
+        self.n_neurons = self.train_data[0].shape[0]
+        self.n_timePoints = self.train_data[0].shape[1]
         self.nDims = nDims
         self.t = t
         self.nTrials = nTrials
         if not initParams:
-            self._init_params()
-            
+            self._init_fit_params()
+        if self.cross_validation['cross_validate']:
+            self._divide_data()
         self.params['epsNoise'] = epsNoise
         self.params['t'] = t
-        self.params['nTrials'] = nTrials
+        self.params['nTrials'] = len(self.train_data)
         print 'initialised! :)'
 
-    def _init_params(self):
+    def _divide_data(self):
+
+        if self.cross_validation['type']=='k-fold':
+            nTrials_train = _np.round(self.cross_validation['CV_fractions'][0]*self.nTrials)
+            nTrials_CV = _np.round(self.cross_validation['CV_fractions'][1]*self.nTrials)
+        elif self.cross_validation['type']=='tvt':
+            nTrials_train =  int(_np.round(self.cross_validation['CV_fractions'][0]*self.nTrials))
+            nTrials_validate = int(_np.round(self.cross_validation['CV_fractions'][1]*self.nTrials))
+            nTrials_test = int(_np.round(self.cross_validation['CV_fractions'][2]*self.nTrials))
+            trlIdxs = range(self.nTrials)
+            _np.random.shuffle(trlIdxs)
+            train_idxs = trlIdxs[:nTrials_train]
+            validate_idxs = trlIdxs[nTrials_train:nTrials_train+nTrials_validate]
+            test_idxs = trlIdxs[nTrials_train+nTrials_validate:]
+            self.train_data = [self.data[i] for i in train_idxs]
+            self.validate_data = [self.data[i] for i in validate_idxs]
+            self.test_data = [self.data[i] for i in test_idxs]
+            self.cross_validation['train_idxs'] = train_idxs
+            self.cross_validation['validate_idxs'] = validate_idxs
+            self.cross_validation['test_idxs'] = test_idxs
+
+    def _init_fit_params(self):
         self.params = {'latent_traj': [_np.zeros([self.nDims,self.n_timePoints]) for i in range(self.nTrials)],
                        'C': _np.random.normal(size=[self.n_neurons,self.nDims]),
                        'd': _np.random.randn(self.n_neurons),
                        'l': [-1]*self.nDims
                        }
+
 
 
     def fit(self,nIter=20):
@@ -45,12 +77,12 @@ class pGPFA(object):
         for iterN in range(nIter):
             print "Running EM iteration %s" %iterN,
             #######   E-step   ###########
-            lapinfres = EM.E_step(self.data,self.params)
+            lapinfres = EM.E_step(self.train_data,self.params)
             self._update_params_E(lapinfres)
 
             self.hists['lapinf'].append(lapinfres)
             #######   M-step   ###########
-            Cdinf, tavInf = EM.M_step(self.data,self.params)
+            Cdinf, tavInf = EM.M_step(self.train_data,self.params)
 
             self.hists['Cdinf'].append(Cdinf); self.hists['tavinf'].append(tavInf)
 
