@@ -38,7 +38,7 @@ All results below are on single trials. In the case of real data, this is cross-
 ![Alt text](./ims/snglTrl_Fit_cv3.png)
 ### See GPFA_package notebook for example of use on simulated data
 
-#This code borrows (heavily) from Hooram Nam's implementation of the same algorithm.
+#This code borrows (heavily) from Hooram Nam's implementation of the same algorithm so it is now !!!much!!! faster.
 
 https://github.com/mackelab/poisson-gpfa
 
