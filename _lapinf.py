@@ -1,7 +1,7 @@
 
 import numpy as np
 import scipy as sp
-def lap_post_unNorm(xbar, ybar, C_big, d,  K_bigInv,t,n_neurons):
+def lap_post_unNorm(xbar, ybar, C_big, d,  K_bigInv,t,n_neurons,alpha):
 
 
     """ calculate p(y|x;0)""" 
@@ -14,9 +14,9 @@ def lap_post_unNorm(xbar, ybar, C_big, d,  K_bigInv,t,n_neurons):
     L2 =  ybar.dot(A)
     L3 =  .5*xbar.T.dot(K_bigInv.dot(xbar))
     p = L1 - L2 + L3 
-    return np.squeeze(p)
+    return (np.squeeze(p) + alpha*np.sum(xbar)**2)
 
-def lap_post_grad(xbar, ybar, C_big, d,  K_bigInv,t,n_neurons):
+def lap_post_grad(xbar, ybar, C_big, d,  K_bigInv,t,n_neurons,alpha):
     """ calculate dp(y|x;0)/dx"""
     nT = len(t)
     xbar = np.array([np.squeeze(xbar)]).T
@@ -26,12 +26,12 @@ def lap_post_grad(xbar, ybar, C_big, d,  K_bigInv,t,n_neurons):
     dL2 = np.dot(ybar, C_big)
     dL3 = np.dot(xbar.T,  K_bigInv)
 
-    dL = dL1 - dL2 + dL3
+    dL = dL1 - dL2 + dL3 
 
-    return np.squeeze(dL)
+    return np.squeeze(dL+np.sum(xbar)*alpha)
 
 
-def lap_post_hess(xbar, ybar, C_big, d, K_bigInv,t,n_neurons):
+def lap_post_hess(xbar, ybar, C_big, d, K_bigInv,t,n_neurons,alpha):
 
     
 

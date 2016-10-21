@@ -6,7 +6,7 @@ from _paraminf import Cd_obsCost, Cd_obsCost_grad, Cd_obsCostFast,Cd_obsCost_gra
 from _gpinf import precompute_gp, GP_timescale_Cost
 
 
-def E_step(ys,params):
+def E_step(ys,params,alpha=.2):
 
     n_timePoints = ys[0].shape[1] 
     n_neurons = ys[0].shape[0]
@@ -28,14 +28,14 @@ def E_step(ys,params):
             fun = lap_post_unNorm,
             x0 = x,
             method='Newton-CG',
-            args = (ybar, C_big, d, K_bigInv,params['t'],n_neurons),
+            args = (ybar, C_big, d, K_bigInv,params['t'],n_neurons,alpha),
             jac = lap_post_grad,
             hess = lap_post_hess,
             options = {'disp': False,'maxiter': 500,'xtol':1e-16
             })
         x_post_mean = resLap.x.reshape(nDims,n_timePoints,order='F')
         postCov = np.linalg.inv(lap_post_hess(resLap.x,ybar, C_big, d,
-                                K_bigInv,params['t'],n_neurons)
+                                K_bigInv,params['t'],n_neurons,alpha)
                                )
         postL = resLap.fun
         #for inference of C and d
@@ -46,16 +46,6 @@ def E_step(ys,params):
 
         #for inference of tav of the GP
         postCov_GP, post_cov_by_latent = covByDim(postCov,nDims,n_timePoints)
-        #first sort by dims
-        #postCov_GP = np.zeros(postCov.shape)
-        #for dim1 in range(nDims):
-        #    for dim2 in range(nDims):
-        #        postCov_GP[dim1*n_timePoints:(dim1+1)*n_timePoints,dim2*n_timePoints:(dim2+1)*n_timePoints] = postCov[dim1::nDims,dim2::nDims]
-        #now separate
-        #post_cov_by_latent = np.zeros([nDims,n_timePoints,n_timePoints])
-        #for i in range(nDims):
-        #    post_cov_by_latent[i] = postCov_GP[i*n_timePoints:(i+1)*n_timePoints,i*n_timePoints:(i+1)*n_timePoints]
-
         if trl_idx==0: 
             lapInfRes = {'post_mean': [x_post_mean],
                      'post_cov': [postCov],

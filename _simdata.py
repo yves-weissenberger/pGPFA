@@ -12,7 +12,7 @@ def _gen_rand_Cd(n_neurons,nDims):
 		loadings from latent states, C
 	"""
 
-	C = np.random.normal(loc=0,scale=.5,size=(n_neurons,nDims))/5
+	C = np.random.normal(loc=0,scale=.5,size=(n_neurons,nDims))/2
 	d = np.random.randint(0,4,size=(n_neurons))/2
 	return C,d
 
