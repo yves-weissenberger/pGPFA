@@ -1,6 +1,7 @@
 
 import numpy as _np
-
+import _util
+import _lapinf
 class pGPFA(object):
         
 
@@ -148,18 +149,82 @@ class pGPFA(object):
 
 
 
-    def leave_n_out(self,n,trl_idx,dset='validation'):
+    def leave_n_out(self,N,trl_idx,dset='validation'):
+        import scipy.optimize as op
         nIdxs = range(self.n_neurons)
         lo_idxs = _np.random.choice(nIdxs,replace=False,size=N)
-        C_lo = np.delete(self.params['C'],lo_idxs,axis=0)
-        d_lo = np.delete(self.params['d'],lo_idxs)
+        C_lo = _np.delete(self.params['C'],lo_idxs,axis=0)
+        d_lo = _np.delete(self.params['d'],lo_idxs)
         
-        y_lo = np.delete(self.dsets[dset][trl_idx])
+        y_lo = _np.delete(self.dsets[dset][trl_idx],lo_idxs,axis=0)
+        C_big = _util.make_Cbig(C_lo,self.n_timePoints)
+
+        K_big,_ = _util.make_Kbig(self.params,self.params['t'],self.nDims,epsNoise=1e-3)
+        K_bigInv = _np.linalg.inv(K_big + _np.eye(K_big.shape[0])*1e-3)
+
+        x = _np.random.normal(size=[self.nDims,self.n_timePoints])
+        xbar = _util.make_xbar(x)
+        ybar = _util.make_ybar(y_lo)
+        
+        resLap = op.minimize(fun = _lapinf.lap_post_unNorm,
+                             x0 = x,
+                             method = 'Newton-CG',
+                             args =
+                             (ybar,C_big,d_lo,K_bigInv,self.params['t'],self.n_neurons-N,0),
+                             jac = _lapinf.lap_post_grad,
+                             hess = _lapinf.lap_post_hess,
+                             options =
+                             {'disp':False,'maxiter':500,'xtol':1e-12}
+                             )
+
+        x_post_mean = resLap.x.reshape(self.nDims,self.n_timePoints,order='F')
+
+        postCov = _np.linalg.inv(_lapinf.lap_post_hess(
+                                                resLap.x,ybar, C_big, d_lo,
+                                                K_bigInv,self.params['t'],self.n_neurons-N,0)
+                               )
+
+        n_timePoints = x_post_mean.shape[1]
+        nDims = x_post_mean.shape[0]
+        post_cov_by_timepoint  = _np.zeros([n_timePoints,nDims,nDims])
+        #for inference of C and d
+        for i in range(n_timePoints):
+                post_cov_by_timepoint[i] = postCov[i*nDims:(i+1)*nDims,i*nDims:(i+1)*nDims]
 
 
+        
+        lo_infRates = _np.exp(self.params['C'][lo_idxs].dot(x_post_mean) + self.params['d'][lo_idxs][:,None])
+        return lo_infRates, lo_idxs, post_cov_by_timepoint,x_post_mean
 
 
-
+    def leave_N_out_CV(self,Ns,n_reps=4,dset='validation'):
+        import copy as cp
+        from _paraminf import Cd_obsCostFast
+        from _util import make_vec_Cd
+        res = {'LL':[],
+               'info':{'n_reps':n_reps,
+                       'Ns':Ns
+                       }
+               }
+         
+        n_outLst = []
+        for N in Ns:
+            trl_lst = []
+            for trl in range(len(self.cross_validation[dset+'_idxs'])):
+                print trl
+                LL = []
+                for run in range(n_reps):
+                    lo_infRates, lo_idxs, postCov, latent_traj = self.leave_n_out(N=N,trl_idx=trl,dset=dset)
+                    vecCd = make_vec_Cd(self.params['C'][lo_idxs],self.params['d'][lo_idxs])
+                    ys_vd = self.dsets[dset][trl][lo_idxs]
+                    lo_params = cp.deepcopy(self.params)
+                    lo_params['post_cov_Cd'] = [postCov]
+                    lo_params['latent_traj'] = [latent_traj]
+                    LL.append(Cd_obsCostFast(vecCd,[ys_vd],[latent_traj],[postCov],lo_params))
+                trl_lst.append(LL)
+            n_outLst.append(trl_lst)
+        res['LL'] = n_outLst
+        return res
 ###############################################################################
 ###################### Plotting Functions #####################################
 ###############################################################################
@@ -225,9 +290,9 @@ class pGPFA(object):
 
 
     def _sample_based_cov_mtx(self,dset):
-        if dset=='validation':
+        if 'valid' in dset:
             x = np.hstack(gpfa.CV_inf['validation']['latent_traj'])
-        elif dset=='train':
+        elif 'train' in dset:
             x = np.hstack(self.params['latent_traj'])
 
         infRates = np.exp(gpfa.params['C'].dot(x)+gpfa.params['d'][:,None])
@@ -243,4 +308,25 @@ class pGPFA(object):
 
 
 
+    def plot_latents(self,trl_idx=0,dset='training',errorbars=True):
+        import seaborn
+        seaborn.set(font_scale=2)
+        seaborn.set_style('whitegrid')
+        plt.figure(figsize=(18,12))
+        clrs = seaborn.color_palette(n_colors=self.nDims)
 
+        min_max = np.max(np.abs(self.params['latent_traj'][trl_idx]))
+        for dim in range(self.nDims):
+            plt.subplot(np.ceil(self.nDims/4),4,dim+1)
+            
+            if 'train' in dset:
+                x = self.params['latent_traj'][trl_idx][dim]
+                std2 = np.sqrt(np.diag(self.params['post_cov_GP'][trl_idx][dim]))
+            else:
+                pass
+            
+            if errorbars:
+                plt.fill_between(self.params['t'],x-std2,x+std2,color=clrs[dim],alpha=.4)
+
+            plt.plot(self.params['t'],x)
+            plt.ylim([-min_max*1.5,min_max*1.5])
