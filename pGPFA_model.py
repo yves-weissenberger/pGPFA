@@ -179,9 +179,14 @@ class pGPFA(object):
 
         x_post_mean = resLap.x.reshape(self.nDims,self.n_timePoints,order='F')
 
-        postCov = _np.linalg.inv(_lapinf.lap_post_hess(
-                                                resLap.x,ybar, C_big, d_lo,
-                                                K_bigInv,self.params['t'],self.n_neurons-N,0)
+        postCov = _np.linalg.inv(_lapinf.lap_post_hess(resLap.x,
+                                                       ybar,
+                                                       C_big,
+                                                       d_lo,
+                                                       K_bigInv,
+                                                       self.params['t'],
+                                                       self.n_neurons-N,
+                                                       0)
                                )
 
         n_timePoints = x_post_mean.shape[1]
@@ -193,7 +198,8 @@ class pGPFA(object):
 
 
         
-        lo_infRates = _np.exp(self.params['C'][lo_idxs].dot(x_post_mean) + self.params['d'][lo_idxs][:,None])
+        lo_infRates = _np.exp(self.params['C'][lo_idxs].dot(x_post_mean) 
+                             + self.params['d'][lo_idxs][:,None])
         return lo_infRates, lo_idxs, post_cov_by_timepoint,x_post_mean
 
 
@@ -214,7 +220,10 @@ class pGPFA(object):
                 print trl
                 LL = []
                 for run in range(n_reps):
-                    lo_infRates, lo_idxs, postCov, latent_traj = self.leave_n_out(N=N,trl_idx=trl,dset=dset)
+                    lo_infRates, lo_idxs, postCov, latent_traj = self.leave_n_out(N=N,
+                                                                                  trl_idx=trl,
+                                                                                  dset=dset)
+
                     vecCd = make_vec_Cd(self.params['C'][lo_idxs],self.params['d'][lo_idxs])
                     ys_vd = self.dsets[dset][trl][lo_idxs]
                     lo_params = cp.deepcopy(self.params)
@@ -255,18 +264,20 @@ class pGPFA(object):
             
             if ground_truth:
                gt_idx = self.get_abs_idx(idx=trl_idx,dset=dset)
-               l3, =  plt.plot(self.t,ground_truth[gt_idx][idx],linestyle='--',color='k',linewidth=2)
-
+               l3, =  plt.plot(self.t,ground_truth[gt_idx][idx],
+                               linestyle='--',color='k',linewidth=2)
+            hlmax = 0 
             for hl in _np.linspace(0,1000,num=201):
                 if (hl<=15 or (5+_np.max(obsRate))>hl):
                     plt.plot(self.t,[hl]*self.n_timePoints,color=[.3]*3,alpha=.2)
+                    hlmax = hl
                     if hl>0:
                         plt.text(_np.max(self.t)-2,hl,str(hl)+'Hz',
                                 color=[.3]*3,fontsize=14,alpha=.8)
 
             plt.xticks([],[])
             plt.yticks([],[])
-            
+            plt.ylim([0,hlmax])
             if idx==0:
                 plt.plot([_np.min(self.t),_np.min(self.t)+2],[-2,-2],color='k',linewidth=2)
                 plt.text(_np.min(self.t),-5,'2s',fontsize=18)
@@ -308,16 +319,20 @@ class pGPFA(object):
 
 
 
-    def plot_latents(self,trl_idx=0,dset='training',errorbars=True):
+    def plot_latents(self,trl_idx=0,dset='train',errorbars=True,ground_truth=0):
         import seaborn
+        import matplotlib.pyplot as plt
+        import numpy as np
         seaborn.set(font_scale=2)
         seaborn.set_style('whitegrid')
-        plt.figure(figsize=(18,12))
+        nRows = np.max([1,np.ceil(np.divide(self.nDims,4))])
+        plt.figure(figsize=(18,3*nRows))
         clrs = seaborn.color_palette(n_colors=self.nDims)
 
-        min_max = np.max(np.abs(self.params['latent_traj'][trl_idx]))
+        min_max = np.max([np.max(np.abs(ground_truth)),
+                       np.max(np.abs(self.params['latent_traj'][trl_idx]))])
         for dim in range(self.nDims):
-            plt.subplot(np.ceil(self.nDims/4),4,dim+1)
+            plt.subplot(nRows+1,4,dim+1)
             
             if 'train' in dset:
                 x = self.params['latent_traj'][trl_idx][dim]
@@ -328,5 +343,10 @@ class pGPFA(object):
             if errorbars:
                 plt.fill_between(self.params['t'],x-std2,x+std2,color=clrs[dim],alpha=.4)
 
-            plt.plot(self.params['t'],x)
+            if type(ground_truth)!=int:
+                plt.plot(self.params['t'],ground_truth[dim],color='k',linestyle='--')
+            plt.plot(self.params['t'],x,color=clrs[dim])
             plt.ylim([-min_max*1.5,min_max*1.5])
+
+
+
