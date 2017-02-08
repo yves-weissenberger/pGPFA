@@ -1,5 +1,6 @@
 
 import numpy as _np
+import copy as _cp
 import _util
 import _lapinf
 class pGPFA(object):
@@ -48,7 +49,9 @@ class pGPFA(object):
                 _np.random.seed(0)
             _np.random.shuffle(trlIdxs)
             train_idxs = trlIdxs[:nTrials_train]
+            train_idxs.sort()
             validation_idxs = trlIdxs[nTrials_train:nTrials_train+nTrials_validation]
+            validation_idxs.sort()
             test_idxs = trlIdxs[nTrials_train+nTrials_validation:]
             self.train_data = [self.data[i] for i in train_idxs]
             self.validation_data = [self.data[i] for i in validation_idxs]
@@ -152,7 +155,11 @@ class pGPFA(object):
     def leave_n_out(self,N,trl_idx,dset='validation'):
         import scipy.optimize as op
         nIdxs = range(self.n_neurons)
-        lo_idxs = _np.random.choice(nIdxs,replace=False,size=N)
+        if type(N)==int:
+            lo_idxs = _np.random.choice(nIdxs,replace=False,size=N)
+        elif (type(N)==list or type(N)==np.ndarray):
+            lo_idxs = _cp.deepcopy(N)
+            N = len(lo_idxs)
         C_lo = _np.delete(self.params['C'],lo_idxs,axis=0)
         d_lo = _np.delete(self.params['d'],lo_idxs)
         
