@@ -90,11 +90,12 @@ class pGPFA(object):
 
         
 
-    def fit(self,nIter=20):
+    def fit(self,nIter=20,lookahead=True,metric='LL',verbose=True):
         import time
         import EM
         from _gpinf import precompute_gp, GP_timescale_Cost
         import scipy.optimize as op
+        import copy as cp
 
         st = time.time()
         self.hists = {'lapinf':[],
@@ -105,7 +106,8 @@ class pGPFA(object):
         self.was_fit = True
 
         for iterN in range(nIter):
-            print "Running EM iteration %s" %iterN,
+            if verbose:
+                print "Running EM iteration %s" %iterN,
             #######   E-step   ###########
             lapinfres = EM.E_step(self.train_data,self.params)
             self._update_params_E(lapinfres)
@@ -117,14 +119,22 @@ class pGPFA(object):
             self.hists['Cdinf'].append(Cdinf); self.hists['tavinf'].append(tavInf)
 
             self._update_params_M(Cdinf,tavInf)
-            
-            print "|| log(L) after M step is: %s ||  total time elapsed: %ss" %(_np.round(Cdinf['logL'],decimals=2),_np.round(time.time()-st,decimals=1))
+
+            if verbose:
+                print "|| log(L): %s ||  total time: %ss" %(_np.round(Cdinf['logL'],decimals=2),_np.round(time.time()-st,decimals=1)),
             self.params['logL_store'].append(Cdinf['logL'])
 
-            if iterN>10:
-                if (self.params['logL_store'][-1]>self.params['logL_store'][-2]):
-                    print 'warning logL started increasing'
-                    #break
+            loo_res = self.leave_N_out_CV(N=10)
+            if iterN>1:
+                if _np.median(loo_res['LL_poiss'])<pLL:
+                    self._update_params_E(self.hists['lapinf'][-2])
+                    self._update_params_M(self.hists['Cdinf'][-2],self.hists['tavinf'][-2])
+                    print "Leave one out error on validation set increased, stopping early"
+                    break
+            pLL = _np.median(loo_res['LL_poiss'])
+            if verbose:
+                print " || Validation LL %s" %_np.round(pLL)
+
 
     def _update_params_E(self,lapinfres):
         self.params['post_cov_Cd'] = lapinfres['post_cov_Cd']
@@ -138,6 +148,7 @@ class pGPFA(object):
         for dim in range(self.nDims):
            self.params['l'][dim] = (1/_np.exp(tavInf[dim].x))**(0.5)
            #print self.params['l'][dim]
+
 
     def test_cross_val(self,trl_type='validation'):
         import EM
@@ -210,36 +221,66 @@ class pGPFA(object):
         return lo_infRates, lo_idxs, post_cov_by_timepoint,x_post_mean
 
 
-    def leave_N_out_CV(self,Ns,n_reps=4,dset='validation'):
+    def leave_N_out_CV(self,N=10,seeds=None,dset='validation'):
         import copy as cp
         from _paraminf import Cd_obsCostFast
         from _util import make_vec_Cd
-        res = {'LL':[],
-               'info':{'n_reps':n_reps,
-                       'Ns':Ns
-                       }
+        import sys
+        res = {'LL_model':[],
+               'LL_poiss':[],
+               'infRates':[],
+               'rates':[],
+               'pearsonr':[],
+               'idxs':[],
+               'seeds':[],
+               'postCov': [],
+               'latent_traj':[]
                }
-         
-        n_outLst = []
-        for N in Ns:
-            trl_lst = []
-            for trl in range(len(self.cross_validation[dset+'_idxs'])):
-                print trl
-                LL = []
-                for run in range(n_reps):
-                    lo_infRates, lo_idxs, postCov, latent_traj = self.leave_n_out(N=N,
-                                                                                  trl_idx=trl,
-                                                                                  dset=dset)
+        if type(seeds)==type(None):
+            seeds = _np.arange(90,95)
 
-                    vecCd = make_vec_Cd(self.params['C'][lo_idxs],self.params['d'][lo_idxs])
-                    ys_vd = self.dsets[dset][trl][lo_idxs]
-                    lo_params = cp.deepcopy(self.params)
-                    lo_params['post_cov_Cd'] = [postCov]
-                    lo_params['latent_traj'] = [latent_traj]
-                    LL.append(Cd_obsCostFast(vecCd,[ys_vd],[latent_traj],[postCov],lo_params))
-                trl_lst.append(LL)
-            n_outLst.append(trl_lst)
-        res['LL'] = n_outLst
+        res['seeds'] = seeds
+        n_dset = len(self.cross_validation[dset+'_idxs'])
+        for seed in seeds:
+            postCovs = []; LL_model = []; l_traj = []
+            for trl in range(n_dset):
+
+
+
+                _np.random.random(seed)
+                lo_infRates, lo_idxs, postCov, latent_traj = self.leave_n_out(N=N,
+                                                                              trl_idx=trl,
+                                                                              dset=dset)
+                yobs = _np.array(self.dsets[dset][trl][lo_idxs])
+                if trl==0:
+                    lo_set = lo_idxs
+                    true_rates = yobs
+                    infRates = lo_infRates
+                else:
+                    true_rates = _np.hstack([true_rates,yobs])
+                    infRates = _np.hstack([infRates,lo_infRates])
+
+
+                #ys_vd = self.dsets[dset][trl][lo_idxs]
+
+                postCovs.append(postCov)
+                l_traj.append(latent_traj)
+                #vecCd = make_vec_Cd(self.params['C'][lo_idxs],self.params['d'][lo_idxs])
+                #lo_params = cp.deepcopy(self.params)
+                #lo_params['post_cov_Cd'] = [postCov]
+                #lo_params['latent_traj'] = [latent_traj]
+                #LL_model.append(Cd_obsCostFast(vecCd,[ys_vd],[latent_traj],[postCov],lo_params))
+            LL = _np.sum(true_rates*_np.log(infRates) - infRates)
+            pearsonr = _np.array([_np.corrcoef(i,j)[0,1]
+                                    for i,j in zip(true_rates,infRates)])
+            #sys.stdout.write("\r")
+
+            res['LL_model'].append(LL_model); res['LL_poiss'].append(LL)
+            res['infRates'].append(infRates); res['rates'].append(true_rates)
+            res['idxs'].append(lo_set); res['pearsonr'].append(pearsonr)
+            res['latent_traj'].append(l_traj); res['postCov'].append(postCovs)
+                
+
         return res
 ###############################################################################
 ###################### Plotting Functions #####################################
@@ -279,14 +320,14 @@ class pGPFA(object):
                     plt.plot(self.t,[hl]*self.n_timePoints,color=[.3]*3,alpha=.2)
                     hlmax = hl
                     if hl>0:
-                        plt.text(_np.max(self.t)-2,hl,str(hl)+'Hz',
+                        plt.text(self.t[2],hl,str(hl)+'Hz',
                                 color=[.3]*3,fontsize=14,alpha=.8)
 
             plt.xticks([],[])
             plt.yticks([],[])
             plt.ylim([0,hlmax])
             if idx==0:
-                plt.plot([_np.min(self.t),_np.min(self.t)+2],[-2,-2],color='k',linewidth=2)
+                plt.plot([_np.min(self.t),_np.min(self.t)+2],[0,0],color='k',linewidth=2)
                 plt.text(_np.min(self.t),-5,'2s',fontsize=18)
             
             plt.xlim([_np.min(self.t),_np.max(self.t)])
@@ -331,7 +372,7 @@ class pGPFA(object):
         import matplotlib.pyplot as plt
         import numpy as np
         seaborn.set(font_scale=2)
-        seaborn.set_style('whitegrid')
+        seaborn.set_style('ticks')
         nRows = np.max([1,np.ceil(np.divide(self.nDims,4))])
         plt.figure(figsize=(18,3*nRows))
         clrs = seaborn.color_palette(n_colors=self.nDims)
