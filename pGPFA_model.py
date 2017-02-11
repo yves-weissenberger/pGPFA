@@ -46,7 +46,7 @@ class pGPFA(object):
             nTrials_test = int(_np.round(self.cross_validation['CV_fractions'][2]*self.nTrials))
             trlIdxs = range(self.nTrials)
             if seed:
-                _np.random.seed(0)
+                _np.random.seed(seed)
             _np.random.shuffle(trlIdxs)
             train_idxs = trlIdxs[:nTrials_train]
             train_idxs.sort()
