@@ -3,6 +3,8 @@ import numpy as _np
 import copy as _cp
 import _util
 import _lapinf
+
+
 class pGPFA(object):
         
 
@@ -44,15 +46,19 @@ class pGPFA(object):
             nTrials_train =  int(_np.round(self.cross_validation['CV_fractions'][0]*self.nTrials))
             nTrials_validation = int(_np.round(self.cross_validation['CV_fractions'][1]*self.nTrials))
             nTrials_test = int(_np.round(self.cross_validation['CV_fractions'][2]*self.nTrials))
+            self.nTrials_train = nTrials_train
+            self.nTrials_validation = nTrials_validation
+            self.nTrials_test = nTrials_test
             trlIdxs = range(self.nTrials)
             if seed:
                 _np.random.seed(seed)
             _np.random.shuffle(trlIdxs)
-            train_idxs = trlIdxs[:nTrials_train]
+            test_idxs = trlIdxs[:nTrials_test]
+            test_idxs.sort()
+            train_idxs = trlIdxs[nTrials_test:nTrials_train+nTrials_test]
             train_idxs.sort()
-            validation_idxs = trlIdxs[nTrials_train:nTrials_train+nTrials_validation]
+            validation_idxs = trlIdxs[nTrials_test+nTrials_train:]
             validation_idxs.sort()
-            test_idxs = trlIdxs[nTrials_train+nTrials_validation:]
             self.train_data = [self.data[i] for i in train_idxs]
             self.validation_data = [self.data[i] for i in validation_idxs]
             self.test_data = [self.data[i] for i in test_idxs]
@@ -76,7 +82,7 @@ class pGPFA(object):
         self.params = {'latent_traj': [_np.zeros([self.nDims,self.n_timePoints]) for i in range(self.nTrials)],
                        'C': _np.random.normal(size=[self.n_neurons,self.nDims]),
                        'd': _np.random.randn(self.n_neurons),
-                       'l': [-1]*self.nDims
+                       'l': [1e-9]*self.nDims
                        }
 
     def check_nDims(self,minD=1,maxD=18):
@@ -90,7 +96,7 @@ class pGPFA(object):
 
         
 
-    def fit(self,nIter=20,lookahead=True,metric='LL',verbose=True):
+    def fit(self,nIter=20,lookahead=True,metric='LL',verbose=True,lNo=5):
         import time
         import EM
         from _gpinf import precompute_gp, GP_timescale_Cost
@@ -104,7 +110,7 @@ class pGPFA(object):
                      }
         
         self.was_fit = True
-
+        to_break = False
         for iterN in range(nIter):
             if verbose:
                 print "Running EM iteration %s" %iterN,
@@ -119,21 +125,29 @@ class pGPFA(object):
             self.hists['Cdinf'].append(Cdinf); self.hists['tavinf'].append(tavInf)
 
             self._update_params_M(Cdinf,tavInf)
+            
+            # inf_rates = _np.exp(self.params['C'].dot(x[trl_idx]) + self.params['d'][:,None])
+            # LLi = _np.sum(self.train_data*_np.log(infRates) - infRates)
 
             if verbose:
                 print "|| log(L): %s ||  total time: %ss" %(_np.round(Cdinf['logL'],decimals=2),_np.round(time.time()-st,decimals=1)),
             self.params['logL_store'].append(Cdinf['logL'])
+            if lookahead:
+                loo_res = self.leave_N_out_CV(N=lNo)
+                #One Step look ahead prediction to monitor convergence
+                if iterN>=1:
+                    if _np.median(loo_res['LL_poiss'])<pLL:
+                        self._update_params_E(self.hists['lapinf'][-2])
+                        self._update_params_M(self.hists['Cdinf'][-2],self.hists['tavinf'][-2])
+                        print "\n\nLeave one out error on validation set increased, stopping early"
+                        to_break = True
+                pLL = _np.median(loo_res['LL_poiss'])
+                if verbose:
+                    print " || cc %s ||" %_np.round(_np.median(loo_res['pearsonr']),decimals=2),
+                    print " || Validation LL %s" %_np.round(pLL/(_np.sum(self.dsets['validation'])),decimals=4)
 
-            loo_res = self.leave_N_out_CV(N=10)
-            if iterN>1:
-                if _np.median(loo_res['LL_poiss'])<pLL:
-                    self._update_params_E(self.hists['lapinf'][-2])
-                    self._update_params_M(self.hists['Cdinf'][-2],self.hists['tavinf'][-2])
-                    print "Leave one out error on validation set increased, stopping early"
+                if to_break:
                     break
-            pLL = _np.median(loo_res['LL_poiss'])
-            if verbose:
-                print " || Validation LL %s" %_np.round(pLL)
 
 
     def _update_params_E(self,lapinfres):
@@ -221,7 +235,7 @@ class pGPFA(object):
         return lo_infRates, lo_idxs, post_cov_by_timepoint,x_post_mean
 
 
-    def leave_N_out_CV(self,N=10,seeds=None,dset='validation'):
+    def leave_N_out_CV(self,N=5,seeds=None,dset='validation',verbose=False):
         import copy as cp
         from _paraminf import Cd_obsCostFast
         from _util import make_vec_Cd
@@ -242,6 +256,8 @@ class pGPFA(object):
         res['seeds'] = seeds
         n_dset = len(self.cross_validation[dset+'_idxs'])
         for seed in seeds:
+            if verbose:
+                sys.stdout.write('\r running seed: %s' %seed)
             postCovs = []; LL_model = []; l_traj = []
             for trl in range(n_dset):
 
